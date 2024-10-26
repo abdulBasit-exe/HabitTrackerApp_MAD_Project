@@ -1,55 +1,51 @@
-// habit model
-
-import 'package:simple_habits/db/database_providers.dart';
+// models/habit.dart
 
 class Habit {
-  int id;
-  String title;
-  bool reminders;
-  String days;
-  String time;
+  final int id;
+  final String title;
+  final String time;
+  final String days; // Comma-separated values representing selected days
+  final int goal;
   int progress;
-  int goal;
   bool isDone;
+  bool reminders;
 
-  Habit(
-      {this.id,
-      this.title,
-      this.reminders,
-      this.days,
-      this.time,
-      this.goal,
-      this.progress,
-      this.isDone});
+  Habit({
+    required this.id,
+    required this.title,
+    required this.time,
+    required this.days,
+    required this.goal,
+    this.progress = 0,
+    this.isDone = false,
+    this.reminders = false,
+  });
 
-  // map habit instance from database
-  Habit.fromMap(Map<String, dynamic> map) {
-    id = map[DatabaseProvider.COLUMN_ID];
-    title = map[DatabaseProvider.COLUMN_TITLE];
-    reminders = map[DatabaseProvider.COLUMN_REMINDERS] == 1;
-    days = map[DatabaseProvider.COLUMN_DAYS];
-    time = map[DatabaseProvider.COLUMN_TIME];
-    goal = map[DatabaseProvider.COLUMN_GOAL];
-    progress = map[DatabaseProvider.COLUMN_PROGRESS];
-    isDone = map[DatabaseProvider.COLUMN_DONE] == 1;
+  // Convert a Habit object into a Map object for database storage
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'time': time,
+      'days': days,
+      'goal': goal,
+      'progress': progress,
+      'isDone': isDone ? 1 : 0,
+      'reminders': reminders ? 1 : 0,
+    };
   }
 
-  // map habit to database
-  Map<String, dynamic> toMap() {
-    var map = <String, dynamic>{
-      DatabaseProvider.COLUMN_TITLE: title,
-      DatabaseProvider.COLUMN_REMINDERS: reminders ? 1 : 0,
-      DatabaseProvider.COLUMN_DAYS: days,
-      DatabaseProvider.COLUMN_TIME: time,
-      DatabaseProvider.COLUMN_GOAL: goal,
-      DatabaseProvider.COLUMN_PROGRESS: progress,
-      DatabaseProvider.COLUMN_DONE: isDone ? 1 : 0
-    };
-
-    if (id != null) {
-      map[DatabaseProvider.COLUMN_ID] = id;
-    }
-
-    return map;
+  // Convert a Map object back into a Habit object
+  static Habit fromMap(Map<String, dynamic> map) {
+    return Habit(
+      id: map['id'],
+      title: map['title'],
+      time: map['time'],
+      days: map['days'],
+      goal: map['goal'],
+      progress: map['progress'],
+      isDone: map['isDone'] == 1,
+      reminders: map['reminders'] == 1,
+    );
   }
 }

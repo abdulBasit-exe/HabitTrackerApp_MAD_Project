@@ -1,141 +1,69 @@
-import 'package:simple_habits/models/habit.dart';
+// db/database_providers.dart
+
+import 'dart:async';
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite/sqlite_api.dart';
 import 'package:path/path.dart';
+import 'package:simple_habits/models/habit.dart';
 
 class DatabaseProvider {
-  static const String TABLE_HABIT = "habit";
-  static const String COLUMN_ID = "id";
-  static const String COLUMN_TITLE = "title";
-  static const String COLUMN_REMINDERS = "reminders";
-  static const String COLUMN_DAYS = "days";
-  static const String COLUMN_TIME = "time";
-  static const String COLUMN_GOAL = "goal";
-  static const String COLUMN_PROGRESS = "progress";
-  static const String COLUMN_DONE = "done";
+  static final DatabaseProvider _instance = DatabaseProvider._internal();
+  static Database? _database;
 
-  DatabaseProvider._();
-  static final DatabaseProvider db = DatabaseProvider._();
-
-  Database _database;
-
-  Future<Database> get database async {
-    if (_database != null) {
-      return _database;
-    }
-
-    _database = await createDatabase();
-
-    return _database;
+  // Factory constructor to return the same instance
+  factory DatabaseProvider() {
+    return _instance;
   }
 
-  // create db
-  Future<Database> createDatabase() async {
-    String dbPath = await getDatabasesPath();
+  // Private constructor
+  DatabaseProvider._internal();
 
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
+  }
+
+  Future<Database> _initDatabase() async {
+    String path = join(await getDatabasesPath(), 'habits.db');
     return await openDatabase(
-      join(dbPath, 'habitDB.db'),
+      path,
       version: 1,
-      onCreate: (Database database, int version) async {
-        print("Creating habit table");
-
-        await database.execute(
-          "CREATE TABLE $TABLE_HABIT ("
-          "$COLUMN_ID INTEGER PRIMARY KEY,"
-          "$COLUMN_TITLE TEXT,"
-          "$COLUMN_REMINDERS INTEGER,"
-          "$COLUMN_DAYS TEXT,"
-          "$COLUMN_TIME TEXT,"
-          "$COLUMN_GOAL INTEGER,"
-          "$COLUMN_PROGRESS INTEGER,"
-          "$COLUMN_DONE INTEGER"
-          ")",
+      onCreate: (db, version) {
+        return db.execute(
+          'CREATE TABLE habits(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, time TEXT, days TEXT, goal INTEGER, progress INTEGER, isDone INTEGER, reminders INTEGER)',
         );
       },
     );
   }
 
-  // get all habits - takes parameters to see if weekly or daily progress needs to reset
-  Future<List<Habit>> getHabits(
-      {bool uncheck = false, bool resetProgress = false}) async {
-    final db = await database;
-
-    var habits = await db.query(TABLE_HABIT, columns: [
-      COLUMN_ID,
-      COLUMN_TITLE,
-      COLUMN_REMINDERS,
-      COLUMN_DAYS,
-      COLUMN_TIME,
-      COLUMN_GOAL,
-      COLUMN_PROGRESS,
-      COLUMN_DONE
-    ]);
-
-    List<Habit> habitList = List<Habit>();
-
-    habits.forEach((element) {
-      Habit habit = Habit.fromMap(element);
-
-      // reset daily
-      if (uncheck) {
-        habit.isDone = false;
+  Future<List<Habit>> getHabits({bool uncheck = false, bool resetProgress = false}) async {
+    final db = await database; // Access database here
+    final List<Map<String, dynamic>> maps = await db.query('habits');
+    
+    if (resetProgress) {
+      for (var habit in maps) {
+        habit['progress'] = 0; // Reset progress
+        await db.update('habits', habit, where: 'id = ?', whereArgs: [habit['id']]);
       }
+    }
 
-      // reset weekly
-      if (resetProgress) {
-        habit.progress = 0;
-      }
-
-      // update
-      db.update(
-        TABLE_HABIT,
-        habit.toMap(),
-        where: "id = ?",
-        whereArgs: [habit.id],
-      );
-
-      habitList.add(habit);
+    return List.generate(maps.length, (i) {
+      return Habit.fromMap(maps[i]);
     });
-
-    return habitList;
   }
 
-  // insert habit
-  Future<Habit> insert(Habit habit) async {
-    final db = await database;
-    habit.id = await db.insert(TABLE_HABIT, habit.toMap());
-    return habit;
+  Future<void> insert(Habit habit) async {
+    final db = await database; // Access database here
+    await db.insert('habits', habit.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  // delete habit
-  Future<int> delete(int id) async {
-    final db = await database;
-
-    return await db.delete(
-      TABLE_HABIT,
-      where: "id = ?",
-      whereArgs: [id],
-    );
+  Future<void> update(Habit habit) async {
+    final db = await database; // Access database here
+    await db.update('habits', habit.toMap(), where: 'id = ?', whereArgs: [habit.id]);
   }
 
-  // delete all habits
-  Future<int> deleteAll() async {
-    final db = await database;
-
-    return await db.delete(
-      TABLE_HABIT,
-    );
-  }
-
-  // update given habit
-  Future<int> update(Habit habit) async {
-    final db = await database;
-
-    return await db.update(
-      TABLE_HABIT,
-      habit.toMap(),
-      where: "id = ?",
-      whereArgs: [habit.id],
-    );
+  Future<void> delete(int id) async {
+    final db = await database; // Access database here
+    await db.delete('habits', where: 'id = ?', whereArgs: [id]);
   }
 }
